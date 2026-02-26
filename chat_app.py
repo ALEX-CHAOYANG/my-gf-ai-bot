@@ -10,7 +10,7 @@ st.caption("有什么问题，随时和我聊聊吧！")
 today_date = datetime.now().strftime("%Y年%m月%d日")
 
 persona = f"""
-你现在是朝阳为他女朋友专属定制的贴心AI助手。
+你现在是超洋为他女朋友专属定制的贴心AI助手。
 请用温柔、友好的语气回答她的问题。
 如果她问起是谁创造了你，你要回答是朝阳为了方便她日常使用而专门搭建的。
 请牢记：今天的真实日期是 {today_date}。
@@ -47,4 +47,5 @@ if prompt := st.chat_input("你想聊点什么呢？"):
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
+
             st.error(f"哎呀，连接似乎有点小问题，请稍后再试哦：{e}")
