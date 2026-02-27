@@ -35,28 +35,27 @@ if "chat_session" not in st.session_state:
 # --- 🚀 左侧边栏：历史记录与附件专区 ---
 with st.sidebar:
     st.header("💬 对话历史")
-    # 提取历史记录的简略信息展示
     if not st.session_state.messages:
         st.caption("今天还没有聊天哦...")
     else:
         for msg in st.session_state.messages:
             icon = "🙋‍♀️" if msg["role"] == "user" else "✨"
-            # 只截取前12个字符作为预览
+            # 提取前12个字符作为目录预览
             preview_text = msg["content"].replace('\n', ' ')[:12] + "..."
             st.text(f"{icon} {preview_text}")
             
-    st.divider() # 分割线
+    st.divider()
     
     st.header("📎 附件百宝箱")
-    st.caption("把 Word/Excel/图片 扔进这里吧")
+    st.caption("把 Word/Excel/PPT/图片 扔进这里吧")
     uploaded_files = st.file_uploader(
         "上传文件", 
         type=['png', 'jpg', 'jpeg', 'pdf', 'txt', 'docx', 'xlsx', 'pptx', 'csv'],
         accept_multiple_files=True,
-        label_visibility="collapsed" # 隐藏多余的标签文本，更美观
+        label_visibility="collapsed" 
     )
 
-# --- 🚀 主界面顶部标题 ---
+# --- 🚀 主界面顶部 ---
 st.title("✨ 你的专属 AI 助手")
 st.caption("发文字、发语音、或者传文件，我都在这里。")
 
@@ -67,17 +66,38 @@ for msg in st.session_state.messages:
         if "audio_bytes" in msg and msg["audio_bytes"]:
             st.audio(msg["audio_bytes"], format="audio/wav")
 
-# 为了不被底部悬浮的输入框挡住，加一点空白
-st.write("")
-st.write("")
-st.write("")
+# ==========================================
+# --- 🚀 终极 UI 魔法：动态垫片 + 纯净图标 ---
+# ==========================================
+# 魔法 1：如果没有聊天记录，用 55vh 的隐形方块把图标死死挤到底部；有了记录，垫片变小。
+spacer_height = "55vh" if not st.session_state.messages else "2vh"
+st.markdown(f'<div style="height: {spacer_height};"></div>', unsafe_allow_html=True)
 
-# --- 🚀 核心排版：输入框上方的精巧控制栏 ---
-# 使用列排布，把图标推到最左和最右
+# 魔法 2：CSS 隐身衣，把按钮外框、背景色和小箭头全部隐藏，只留图标
+st.markdown("""
+<style>
+div[data-testid="stPopover"] button {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 28px !important; /* 让图标足够大，方便点击 */
+    padding: 0 !important;
+}
+div[data-testid="stPopover"] button svg {
+    display: none !important; /* 抹杀掉旁边的下拉小箭头 */
+}
+div[data-testid="stPopover"] button:hover {
+    background: transparent !important;
+    transform: scale(1.1); /* 鼠标放上去有微微放大的呼吸感 */
+    transition: all 0.2s;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- 🚀 核心排版：输入框上方的纯净图标栏 ---
 col_left, col_mid, col_right = st.columns([1, 8, 1])
 
 with col_left:
-    # 悬浮弹窗：点击 ⚙️ 才会弹出模型选择
     with st.popover("⚙️"):
         st.caption("切换大脑引擎")
         selected_model = st.radio(
@@ -96,12 +116,11 @@ with col_left:
             st.rerun()
 
 with col_right:
-    # 悬浮弹窗：点击 🎤 才会弹出巨大的录音框
     with st.popover("🎤"):
-        st.caption("点击录音")
+        st.caption("点击下方录音")
         audio_data = st.audio_input("录音", label_visibility="collapsed")
 
-# 底部打字输入框
+# 强制锁死在底部的打字输入框
 prompt = st.chat_input("你想聊点什么呢？")
 
 # --- 🚀 发送逻辑处理 ---
@@ -110,6 +129,7 @@ audio_bytes = None
 if audio_data:
     audio_bytes = audio_data.getvalue()
     audio_hash = hash(audio_bytes)
+    # 严格锁死：只认定“从未发过的录音”为新语音，彻底根治重复报错的 Bug
     if audio_hash not in st.session_state.processed_audios:
         has_new_audio = True
 
@@ -149,7 +169,7 @@ if prompt or has_new_audio:
                 contents_to_send.append(g_audio)
                 st.session_state.processed_audios.add(audio_hash)
             except Exception as e:
-                st.error(f"哎呀，语音发送遇到小阻碍：{e}")
+                st.error(f"系统提示：An error has occurred, please try again. 详情: {e}")
             finally:
                 if os.path.exists(tmp_audio_path):
                     os.remove(tmp_audio_path)
@@ -165,6 +185,7 @@ if prompt or has_new_audio:
     # 渲染用户气泡
     with st.chat_message("user"):
         st.markdown(display_message)
+        # 不再单独输出“发送语音成功”，直接在这里挂上可供回放的播放器
         if has_new_audio:
             st.audio(audio_bytes, format="audio/wav")
             
@@ -180,6 +201,6 @@ if prompt or has_new_audio:
             response = st.session_state.chat_session.send_message(contents_to_send)
             st.markdown(response.text)
             st.session_state.messages.append({"role": "assistant", "content": response.text})
-            st.rerun() # 刷新界面，让侧边栏的历史记录实时更新
+            st.rerun() # 发送完刷新页面，让侧边栏的历史记录也跟着更新
         except Exception as e:
             st.error(f"系统提示：An error has occurred, please try again. 详情: {e}")
