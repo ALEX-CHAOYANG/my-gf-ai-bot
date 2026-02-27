@@ -15,7 +15,7 @@ persona = f"""
 请牢记：今天的真实日期是 {today_date}。
 """
 
-# 1. 初始化各类状态变量
+# 1. 初始化变量
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "processed_files" not in st.session_state:
@@ -23,7 +23,7 @@ if "processed_files" not in st.session_state:
 if "processed_audios" not in st.session_state:
     st.session_state.processed_audios = set()
 if "current_model" not in st.session_state:
-    st.session_state.current_model = "models/gemini-3-flash-preview"
+    st.session_state.current_model = "models/gemini-2.0-flash-exp" # 默认模型
 if "client" not in st.session_state:
     st.session_state.client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 if "chat_session" not in st.session_state:
@@ -32,22 +32,10 @@ if "chat_session" not in st.session_state:
         config=types.GenerateContentConfig(system_instruction=persona)
     )
 
-# --- 🚀 左侧边栏：历史记录与附件专区 ---
+# --- 🚀 左侧边栏：仅保留附件功能 ---
 with st.sidebar:
-    st.header("💬 对话历史")
-    if not st.session_state.messages:
-        st.caption("今天还没有聊天哦...")
-    else:
-        for msg in st.session_state.messages:
-            icon = "🙋‍♀️" if msg["role"] == "user" else "✨"
-            # 提取前12个字符作为目录预览
-            preview_text = msg["content"].replace('\n', ' ')[:12] + "..."
-            st.text(f"{icon} {preview_text}")
-            
-    st.divider()
-    
     st.header("📎 附件百宝箱")
-    st.caption("把 Word/Excel/PPT/图片 扔进这里吧")
+    st.caption("把需要我看的文档或图片扔进这里")
     uploaded_files = st.file_uploader(
         "上传文件", 
         type=['png', 'jpg', 'jpeg', 'pdf', 'txt', 'docx', 'xlsx', 'pptx', 'csv'],
@@ -66,43 +54,42 @@ for msg in st.session_state.messages:
         if "audio_bytes" in msg and msg["audio_bytes"]:
             st.audio(msg["audio_bytes"], format="audio/wav")
 
-# ==========================================
-# --- 🚀 终极 UI 魔法：动态垫片 + 纯净图标 ---
-# ==========================================
-# 魔法 1：如果没有聊天记录，用 55vh 的隐形方块把图标死死挤到底部；有了记录，垫片变小。
+# --- 🚀 UI 布局调整：动态垫片 ---
 spacer_height = "55vh" if not st.session_state.messages else "2vh"
 st.markdown(f'<div style="height: {spacer_height};"></div>', unsafe_allow_html=True)
 
-# 魔法 2：CSS 隐身衣，把按钮外框、背景色和小箭头全部隐藏，只留图标
+# CSS 优化：让按钮看起来像带文字的标签，去掉多余边框
 st.markdown("""
 <style>
 div[data-testid="stPopover"] button {
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    font-size: 28px !important; /* 让图标足够大，方便点击 */
-    padding: 0 !important;
-}
-div[data-testid="stPopover"] button svg {
-    display: none !important; /* 抹杀掉旁边的下拉小箭头 */
+    border: 1px solid #f0f2f6 !important;
+    background: #ffffff !important;
+    border-radius: 20px !important;
+    padding: 2px 12px !important;
+    font-size: 14px !important;
+    color: #555 !important;
 }
 div[data-testid="stPopover"] button:hover {
-    background: transparent !important;
-    transform: scale(1.1); /* 鼠标放上去有微微放大的呼吸感 */
-    transition: all 0.2s;
+    border-color: #ff4b4b !important;
+    color: #ff4b4b !important;
+}
+/* 隐藏下拉箭头 */
+div[data-testid="stPopover"] button svg {
+    display: none !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 🚀 核心排版：输入框上方的纯净图标栏 ---
-col_left, col_mid, col_right = st.columns([1, 8, 1])
+# --- 🚀 核心排版：带文字的图标按钮栏 ---
+col_left, col_mid, col_right = st.columns([2, 5, 2])
 
 with col_left:
-    with st.popover("⚙️"):
+    # ⚙️ 旁边增加“模型选择”
+    with st.popover("⚙️ 模型选择"):
         st.caption("切换大脑引擎")
         selected_model = st.radio(
             "选择模型",
-            ["models/gemini-3-flash-preview", "models/gemini-3-pro-preview"],
+            ["models/gemini-2.0-flash-exp", "models/gemini-2.0-pro-exp-02-05"],
             index=0 if "flash" in st.session_state.current_model else 1,
             label_visibility="collapsed"
         )
@@ -116,11 +103,12 @@ with col_left:
             st.rerun()
 
 with col_right:
-    with st.popover("🎤"):
-        st.caption("点击下方录音")
+    # 🎤 旁边增加“语音输入”
+    with st.popover("🎤 语音输入"):
+        st.caption("点击下方开始说话")
         audio_data = st.audio_input("录音", label_visibility="collapsed")
 
-# 强制锁死在底部的打字输入框
+# 底部打字输入框
 prompt = st.chat_input("你想聊点什么呢？")
 
 # --- 🚀 发送逻辑处理 ---
@@ -129,7 +117,6 @@ audio_bytes = None
 if audio_data:
     audio_bytes = audio_data.getvalue()
     audio_hash = hash(audio_bytes)
-    # 严格锁死：只认定“从未发过的录音”为新语音，彻底根治重复报错的 Bug
     if audio_hash not in st.session_state.processed_audios:
         has_new_audio = True
 
@@ -137,11 +124,11 @@ if prompt or has_new_audio:
     contents_to_send = []
     display_message = ""
 
-    # 处理文件附件
+    # 1. 处理文件
     if uploaded_files:
         new_files = [f for f in uploaded_files if f.name not in st.session_state.processed_files]
         if new_files:
-            with st.spinner(f"正在读取 {len(new_files)} 个新文件..."):
+            with st.spinner(f"正在读取文件..."):
                 for file in new_files:
                     file_ext = file.name.split('.')[-1]
                     with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
@@ -151,16 +138,16 @@ if prompt or has_new_audio:
                         g_file = st.session_state.client.files.upload(file=tmp_file_path)
                         contents_to_send.append(g_file)
                         st.session_state.processed_files.add(file.name)
-                    except Exception as e:
-                        st.error(f"解析 {file.name} 失败：{e}")
+                    except Exception:
+                        pass
                     finally:
                         if os.path.exists(tmp_file_path):
                             os.remove(tmp_file_path)
-            display_message += f"📎 *[附件: 包含 {len(new_files)} 个文件]*\n\n"
+            display_message += f"📎 *[已上传 {len(new_files)} 个附件]*\n\n"
 
-    # 处理语音
+    # 2. 处理语音
     if has_new_audio:
-        with st.spinner("正在倾听你的语音..."):
+        with st.spinner("处理语音中..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
                 tmp_audio.write(audio_bytes)
                 tmp_audio_path = tmp_audio.name
@@ -168,39 +155,37 @@ if prompt or has_new_audio:
                 g_audio = st.session_state.client.files.upload(file=tmp_audio_path)
                 contents_to_send.append(g_audio)
                 st.session_state.processed_audios.add(audio_hash)
-            except Exception as e:
-                st.error(f"系统提示：An error has occurred, please try again. 详情: {e}")
+            except Exception:
+                st.error("系统提示：An error has occurred, please try again.")
             finally:
                 if os.path.exists(tmp_audio_path):
                     os.remove(tmp_audio_path)
         display_message += "🎤 *[发送了一条语音]*\n\n"
 
-    # 处理文字
+    # 3. 处理文字
     if prompt:
         contents_to_send.append(prompt)
         display_message += prompt
-    elif has_new_audio and not prompt:
-        contents_to_send.append("请听这段语音并温柔地回复我。")
+    elif has_new_audio:
+        contents_to_send.append("请听这段语音。")
 
-    # 渲染用户气泡
-    with st.chat_message("user"):
-        st.markdown(display_message)
-        # 不再单独输出“发送语音成功”，直接在这里挂上可供回放的播放器
-        if has_new_audio:
-            st.audio(audio_bytes, format="audio/wav")
-            
-    st.session_state.messages.append({
-        "role": "user", 
-        "content": display_message,
-        "audio_bytes": audio_bytes if has_new_audio else None
-    })
+    # 渲染与请求
+    if contents_to_send:
+        with st.chat_message("user"):
+            st.markdown(display_message)
+            if has_new_audio:
+                st.audio(audio_bytes, format="audio/wav")
+        
+        st.session_state.messages.append({
+            "role": "user", 
+            "content": display_message,
+            "audio_bytes": audio_bytes if has_new_audio else None
+        })
 
-    # 渲染AI气泡
-    with st.chat_message("assistant"):
-        try:
-            response = st.session_state.chat_session.send_message(contents_to_send)
-            st.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-            st.rerun() # 发送完刷新页面，让侧边栏的历史记录也跟着更新
-        except Exception as e:
-            st.error(f"系统提示：An error has occurred, please try again. 详情: {e}")
+        with st.chat_message("assistant"):
+            try:
+                response = st.session_state.chat_session.send_message(contents_to_send)
+                st.markdown(response.text)
+                st.session_state.messages.append({"role": "assistant", "content": response.text})
+            except Exception:
+                st.error("系统提示：An error has occurred, please try again.")
