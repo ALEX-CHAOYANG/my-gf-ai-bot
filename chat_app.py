@@ -4,9 +4,39 @@ from google.genai import types
 from datetime import datetime
 import tempfile
 import os
-import uuid  # 新增：用于生成每个对话的唯一 ID
+import uuid  # 用于生成每个对话的唯一 ID
 
 st.set_page_config(page_title="专属 AI 助手", page_icon="✨")
+
+# ==========================================
+# 🔐 0. 门禁系统：账号密码登录
+# ==========================================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if not st.session_state.logged_in:
+    st.title("✨ 专属 AI 助手")
+    st.caption("这里是私人专属空间，请输入通行证哦~")
+    
+    with st.form("login_form"):
+        username = st.text_input("账号")
+        password = st.text_input("密码", type="password") # 密码会以星号显示
+        submit = st.form_submit_button("登录进入")
+        
+        if submit:
+            # 严格核对账号和密码
+            if username == "lichaoyang" and password == "86126748":
+                st.session_state.logged_in = True
+                st.rerun() # 密码正确，刷新页面进入主程序
+            else:
+                st.error("账号或密码不对哦，请再试一次~")
+    
+    # st.stop() 是一道结界，没有登录成功的话，代码永远不会往下执行
+    st.stop() 
+
+# ==========================================
+# 下方为原有的核心应用程序（登录后可见）
+# ==========================================
 
 today_date = datetime.now().strftime("%Y年%m月%d日")
 persona = f"""
@@ -68,7 +98,6 @@ with st.sidebar:
     st.caption("对话列表")
     
     # 遍历显示所有历史对话
-    # 将字典转为列表并反转，让最新创建的对话排在最上面
     chat_items = list(st.session_state.conversations.items())
     for cid, c_data in reversed(chat_items):
         # 当前选中的对话加上高亮小手提示
@@ -87,6 +116,13 @@ with st.sidebar:
         accept_multiple_files=True,
         label_visibility="collapsed" 
     )
+    
+    # 新增：退出登录按钮放在侧边栏最下方
+    st.write("")
+    st.write("")
+    if st.button("🚪 退出登录", use_container_width=True):
+        st.session_state.logged_in = False
+        st.rerun()
 
 # --- 🚀 主界面顶部 ---
 st.title("✨ 你的专属 AI 助手")
