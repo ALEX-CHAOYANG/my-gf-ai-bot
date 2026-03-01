@@ -4,7 +4,7 @@ from google.genai import types
 from datetime import datetime
 import tempfile
 import os
-import uuid  # 用于生成每个对话的唯一 ID
+import uuid  
 
 st.set_page_config(page_title="专属 AI 助手", page_icon="✨")
 
@@ -20,18 +20,16 @@ if not st.session_state.logged_in:
     
     with st.form("login_form"):
         username = st.text_input("账号")
-        password = st.text_input("密码", type="password") # 密码会以星号显示
+        password = st.text_input("密码", type="password") 
         submit = st.form_submit_button("登录进入")
         
         if submit:
-            # 严格核对账号和密码
             if username == "lichaoyang" and password == "86126748":
                 st.session_state.logged_in = True
-                st.rerun() # 密码正确，刷新页面进入主程序
+                st.rerun() 
             else:
                 st.error("账号或密码不对哦，请再试一次~")
     
-    # st.stop() 是一道结界，没有登录成功的话，代码永远不会往下执行
     st.stop() 
 
 # ==========================================
@@ -49,7 +47,6 @@ persona = f"""
 # ==========================================
 # 1. 核心升级：多会话状态管理
 # ==========================================
-# 初始化最外层的对话保险箱
 if "conversations" not in st.session_state:
     init_id = str(uuid.uuid4())
     st.session_state.conversations = {
@@ -67,11 +64,9 @@ if "conversations" not in st.session_state:
 if "client" not in st.session_state:
     st.session_state.client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-# 锁定当前正在使用的对话抽屉
 curr_chat_id = st.session_state.current_chat_id
 curr_chat = st.session_state.conversations[curr_chat_id]
 
-# 如果当前对话还没有连上 AI，就初始化连接
 if curr_chat["chat_session"] is None:
     curr_chat["chat_session"] = st.session_state.client.chats.create(
         model=curr_chat["model"],
@@ -80,7 +75,6 @@ if curr_chat["chat_session"] is None:
 
 # --- 🚀 左侧边栏：多对话列表与附件专区 ---
 with st.sidebar:
-    # 顶部：发起新对话按钮
     if st.button("📝 发起新对话", use_container_width=True):
         new_id = str(uuid.uuid4())
         st.session_state.conversations[new_id] = {
@@ -88,7 +82,7 @@ with st.sidebar:
             "messages": [],
             "processed_files": set(),
             "processed_audios": set(),
-            "model": curr_chat["model"], # 继承上一个对话的模型设置
+            "model": curr_chat["model"], 
             "chat_session": None
         }
         st.session_state.current_chat_id = new_id
@@ -97,10 +91,8 @@ with st.sidebar:
     st.write("")
     st.caption("对话列表")
     
-    # 遍历显示所有历史对话
     chat_items = list(st.session_state.conversations.items())
     for cid, c_data in reversed(chat_items):
-        # 当前选中的对话加上高亮小手提示
         btn_label = f"👉 {c_data['title']}" if cid == curr_chat_id else f"💬 {c_data['title']}"
         if st.button(btn_label, key=cid, use_container_width=True):
             st.session_state.current_chat_id = cid
@@ -117,7 +109,6 @@ with st.sidebar:
         label_visibility="collapsed" 
     )
     
-    # 新增：退出登录按钮放在侧边栏最下方
     st.write("")
     st.write("")
     if st.button("🚪 退出登录", use_container_width=True):
@@ -186,7 +177,6 @@ with col_right:
         st.caption("点击下方录音")
         audio_data = st.audio_input("录音", label_visibility="collapsed")
 
-# 底部固定的文本输入框
 prompt = st.chat_input("你想聊点什么呢？")
 
 # --- 🚀 发送逻辑处理 ---
@@ -202,7 +192,6 @@ if prompt or has_new_audio:
     contents_to_send = []
     display_message = ""
 
-    # 1. 处理文件
     if uploaded_files:
         new_files = [f for f in uploaded_files if f.name not in curr_chat["processed_files"]]
         if new_files:
@@ -223,7 +212,6 @@ if prompt or has_new_audio:
                             os.remove(tmp_file_path)
             display_message += f"📎 *[附件: 已上传 {len(new_files)} 个文件]*\n\n"
 
-    # 2. 处理语音
     if has_new_audio:
         with st.spinner("处理语音中..."):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_audio:
@@ -240,11 +228,9 @@ if prompt or has_new_audio:
                     os.remove(tmp_audio_path)
         display_message += "🎤 *[发送了一条语音]*\n\n"
 
-    # 3. 处理文字与标题自动生成
     if prompt:
         contents_to_send.append(prompt)
         display_message += prompt
-        # 如果当前是新对话，自动把第一句话截取作为左侧边栏的标题
         if curr_chat["title"] == "新对话":
             curr_chat["title"] = prompt[:10] + ("..." if len(prompt) > 10 else "")
     elif has_new_audio and not prompt:
@@ -252,13 +238,16 @@ if prompt or has_new_audio:
         if curr_chat["title"] == "新对话":
             curr_chat["title"] = "🎤 语音对话"
 
-    # 渲染与请求
+    # ==========================================
+    # 🚨 核心修复区：防卡死机制
+    # ==========================================
     if contents_to_send:
         with st.chat_message("user"):
             st.markdown(display_message)
             if has_new_audio:
                 st.audio(audio_bytes, format="audio/wav")
         
+        # 先把用户的话存入记忆
         curr_chat["messages"].append({
             "role": "user", 
             "content": display_message,
@@ -270,7 +259,9 @@ if prompt or has_new_audio:
                 response = curr_chat["chat_session"].send_message(contents_to_send)
                 st.markdown(response.text)
                 curr_chat["messages"].append({"role": "assistant", "content": response.text})
-                # 触发页面刷新，以更新左侧栏的动态标题
                 st.rerun() 
-            except Exception:
-                st.error("系统提示：An error has occurred, please try again.")
+            except Exception as e:
+                # 【关键修复】如果回复失败，把刚才存进去的“用户提问”从记忆里撤回！
+                if curr_chat["messages"]:
+                    curr_chat["messages"].pop()
+                st.error(f"系统提示：An error has occurred, please try again. (暗号：{e})")
