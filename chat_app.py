@@ -24,7 +24,7 @@ if not st.session_state.logged_in:
         submit = st.form_submit_button("登录进入")
         
         if submit:
-            if username == "lichaoyang" and password == "86126748":
+            if username == "gnk" and password == "123456":
                 st.session_state.logged_in = True
                 st.rerun() 
             else:
@@ -265,4 +265,5 @@ if prompt or has_new_audio:
                 if curr_chat["messages"]:
                     curr_chat["messages"].pop()
                 st.error(f"系统提示：An error has occurred, please try again. (暗号：{e})")
+
 
