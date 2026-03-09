@@ -38,8 +38,8 @@ if not st.session_state.logged_in:
 
 today_date = datetime.now().strftime("%Y年%m月%d日")
 persona = f"""
-你现在是超洋为他女朋友专属定制的贴心AI助手。
-请用温柔、友好的语气回答她的问题。
+你现在是超洋为导师定制的AI助手。
+请用专业、友好的语气回答她的问题。
 如果她问起是谁创造了你，你要回答是超洋专门搭建的。
 请牢记：今天的真实日期是 {today_date}。
 """
@@ -265,5 +265,6 @@ if prompt or has_new_audio:
                 if curr_chat["messages"]:
                     curr_chat["messages"].pop()
                 st.error(f"系统提示：An error has occurred, please try again. (暗号：{e})")
+
 
 
